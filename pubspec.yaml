@@ -1,0 +1,35 @@
+name: project
+description: A Flutter application for teacher and student management at the University of Dhaka.
+version: 3.8.1
+environment:
+  sdk: '>=3.8.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.3.0
+  flutter_animate: ^4.5.0
+  file_picker: ^8.1.2
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
+  crypto: ^3.0.5
+  supabase_flutter: ^2.0.0
+  form_validation: ^3.2.0
+  dotenv: ^4.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/dulogo.png
+    - assets/profile.png
+    - assets/Instagram.png
+    - assets/anisha.png
+    - assets/atiya.png
+    - assets/biplop.png
+    - assets/sara.png
