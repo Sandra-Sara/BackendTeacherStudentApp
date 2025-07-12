@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LeavePage extends StatefulWidget {
   const LeavePage({super.key});
@@ -16,7 +17,7 @@ class _LeavePageState extends State<LeavePage> {
   void initState() {
     super.initState();
     _toController.text = 'registrar@du.ac.bd';
-    _subjectController.text = 'Application for Leave of Absence';
+    _subjectController.text = 'Reason for Leave (e.g., Illness, Personal Matter)'; // ইনিশিয়াল সাজেশন
   }
 
   @override
@@ -27,12 +28,35 @@ class _LeavePageState extends State<LeavePage> {
     super.dispose();
   }
 
-  void _sendEmail() {
+  Future<void> _sendEmail() async {
     if (_toController.text.isNotEmpty && _subjectController.text.isNotEmpty && _bodyController.text.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email sent successfully!')),
-      );
-      _bodyController.clear();
+      try {
+        final supabase = Supabase.instance.client;
+        final userId = supabase.auth.currentUser?.id;
+
+        if (userId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please log in first.')),
+          );
+          return;
+        }
+
+        await supabase.from('leave_applications').insert({
+          'user_id': userId,
+          'to_email': _toController.text,
+          'subject': _subjectController.text,
+          'body': _bodyController.text,
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Leave application submitted successfully!')),
+        );
+        _bodyController.clear();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error submitting application: $e')),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
@@ -100,7 +124,7 @@ class _LeavePageState extends State<LeavePage> {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Subject:',
+                        'Subject (Reason for Leave):',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -112,7 +136,7 @@ class _LeavePageState extends State<LeavePage> {
                         controller: _subjectController,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
-                          hintText: 'Enter subject',
+                          hintText: 'e.g., Illness, Family Emergency, etc.',
                           contentPadding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
                         ),
                       ),

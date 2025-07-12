@@ -26,7 +26,7 @@ class AttendancePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Image.asset(
-                'assets/dulogo1.png',
+                'assets/dulogo.png',
                 height: 150,
                 width: 300,
               ),

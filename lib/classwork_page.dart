@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:file_picker/file_picker.dart';
 
 class ClassworkPage extends StatefulWidget {
   const ClassworkPage({super.key});
@@ -13,6 +15,7 @@ class _ClassworkPageState extends State<ClassworkPage> {
   final TextEditingController _submissionController = TextEditingController();
   final List<String> _courses = ['CSE 2201', 'CSE 2202', 'CSE 2203', 'CSE 2204', 'CSE 2205'];
   List<String> _submissions = [];
+  bool _isUploading = false; // ফাইল আপলোডের জন্য লোডিং স্টেট
 
   @override
   void initState() {
@@ -21,7 +24,6 @@ class _ClassworkPageState extends State<ClassworkPage> {
   }
 
   Future<void> _loadSubmissions() async {
-    var SharedPreferences;
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _submissions = prefs.getStringList('classwork_submissions') ?? [];
@@ -48,6 +50,60 @@ class _ClassworkPageState extends State<ClassworkPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a course and enter submission details')),
       );
+    }
+  }
+
+  Future<void> _uploadFile() async {
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.any, // যেকোনো ফাইল (PDF, DOC, IMG ইত্যাদি)
+      );
+
+      if (result != null) {
+        final file = result.files.first;
+        final supabase = Supabase.instance.client;
+        final userId = supabase.auth.currentUser?.id;
+
+        if (userId != null) {
+          final filePath = 'classwork/$userId/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+          await supabase.storage
+              .from('classwork-files') // আপনার বাকেট নাম
+              .uploadBinary(
+            filePath,
+            file.bytes!,
+            fileOptions: FileOptions(contentType: file.extension == 'pdf' ? 'application/pdf' : 'application/octet-stream'),
+          );
+
+          final fileUrl = supabase.storage.from('classwork-files').getPublicUrl(filePath);
+          setState(() {
+            _submissions.add('$_selectedCourse: File uploaded - $fileUrl');
+            _saveSubmissions();
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('File uploaded successfully! URL: $fileUrl')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User not logged in.')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No file selected.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading file: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
     }
   }
 
@@ -162,10 +218,10 @@ class _ClassworkPageState extends State<ClassworkPage> {
                   );
                 },
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
               Center(
                 child: ElevatedButton(
-                  onPressed: _submitClasswork,
+                  onPressed: _isUploading ? null : _submitClasswork,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     minimumSize: const Size(200, 50),
@@ -176,6 +232,30 @@ class _ClassworkPageState extends State<ClassworkPage> {
                   ),
                   child: const Text(
                     'Submit',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _isUploading ? null : _uploadFile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    minimumSize: const Size(200, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 5,
+                  ),
+                  child: _isUploading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                    'Upload File',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
