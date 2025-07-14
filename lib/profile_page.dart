@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -10,64 +12,140 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _isEditing = false;
+  String? _profileImageUrl;
   Map<String, String> _profileData = {
     'Name': 'unknown',
-    'Registration Number': '2022315933',
+    'ID Number': '2022315933',
     'Department': 'enter your dept name',
     'Email': 'your profile',
     'Phone': 'your phone number',
-    'Current Semester': 'your year and symester',
+    'Current Semester': 'your year and semester',
     'Attached Hall': 'enter hall name',
-    'Percentage': '0%',
+    'Role': 'student',
   };
   late Map<String, TextEditingController> _controllers;
+  final String userId = Supabase.instance.client.auth.currentUser?.id ?? '';
 
   @override
   void initState() {
     super.initState();
     _controllers = {
       'Name': TextEditingController(text: _profileData['Name']),
-      'Registration Number': TextEditingController(text: _profileData['Registration Number']),
+      'ID Number': TextEditingController(text: _profileData['ID Number']),
       'Department': TextEditingController(text: _profileData['Department']),
       'Email': TextEditingController(text: _profileData['Email']),
       'Phone': TextEditingController(text: _profileData['Phone']),
       'Current Semester': TextEditingController(text: _profileData['Current Semester']),
       'Attached Hall': TextEditingController(text: _profileData['Attached Hall']),
-      'Percentage': TextEditingController(text: _profileData['Percentage']),
+      'Role': TextEditingController(text: _profileData['Role']),
     };
     _loadProfile();
   }
 
   Future<void> _loadProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _profileData = {
-        'Name': prefs.getString('profile_name') ?? _profileData['Name']!,
-        'Registration Number': prefs.getString('profile_reg') ?? _profileData['Registration Number']!,
-        'Department': prefs.getString('profile_dept') ?? _profileData['Department']!,
-        'Email': prefs.getString('profile_email') ?? _profileData['Email']!,
-        'Phone': prefs.getString('profile_phone') ?? _profileData['Phone']!,
-        'Current Semester': prefs.getString('profile_semester') ?? _profileData['Current Semester']!,
-        'Attached Hall': prefs.getString('profile_hall') ?? _profileData['Attached Hall']!,
-        'Percentage': prefs.getString('profile_percentage') ?? _profileData['Percentage']!,
-      };
-      _controllers.forEach((key, controller) {
-        controller.text = _profileData[key]!;
-      });
-    });
+    if (userId.isNotEmpty) {
+      print('User ID: $userId');
+      final response = await Supabase.instance.client
+          .from('profiles')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (response != null) {
+        setState(() {
+          _profileData = {
+            'Name': response['name'] ?? _profileData['Name']!,
+            'ID Number': response['id_number'] ?? _profileData['ID Number']!,
+            'Department': response['department'] ?? _profileData['Department']!,
+            'Email': response['email'] ?? _profileData['Email']!,
+            'Phone': response['phone'] ?? _profileData['Phone']!,
+            'Current Semester': response['current_semester'] ?? _profileData['Current Semester']!,
+            'Attached Hall': response['attached_hall'] ?? _profileData['Attached Hall']!,
+            'Role': response['role'] ?? _profileData['Role']!,
+          };
+          _profileImageUrl = response['profile_image_url'];
+          _controllers.forEach((key, controller) {
+            controller.text = _profileData[key]!;
+          });
+        });
+      }
+    }
   }
 
   Future<void> _saveProfile() async {
-    var SharedPreferences;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('profile_name', _controllers['Name']!.text);
-    await prefs.setString('profile_reg', _controllers['Registration Number']!.text);
-    await prefs.setString('profile_dept', _controllers['Department']!.text);
-    await prefs.setString('profile_email', _controllers['Email']!.text);
-    await prefs.setString('profile_phone', _controllers['Phone']!.text);
-    await prefs.setString('profile_semester', _controllers['Current Semester']!.text);
-    await prefs.setString('profile_hall', _controllers['Attached Hall']!.text);
-    await prefs.setString('profile_percentage', _controllers['Percentage']!.text);
+    if (userId.isNotEmpty) {
+      final updatedData = {
+        'user_id': userId,
+        'name': _controllers['Name']!.text,
+        'id_number': _controllers['ID Number']!.text,
+        'department': _controllers['Department']!.text,
+        'email': _controllers['Email']!.text,
+        'phone': _controllers['Phone']!.text,
+        'current_semester': _controllers['Current Semester']!.text,
+        'attached_hall': _controllers['Attached Hall']!.text,
+        'role': _controllers['Role']!.text,
+        'profile_image_url': _profileImageUrl,
+      };
+      print('Saving profile data: $updatedData');
+      await Supabase.instance.client.from('profiles').upsert(updatedData);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile saved!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login to save the profile!')),
+      );
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final ImagePicker picker = ImagePicker();
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select the image source'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, ImageSource.gallery),
+            child: const Text('Gallery'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, ImageSource.camera),
+            child: const Text('Camera'),
+          ),
+        ],
+      ),
+    );
+
+    if (source != null) {
+      final XFile? pickedFile = await picker.pickImage(source: source);
+
+      if (pickedFile != null) {
+        try {
+          final file = File(pickedFile.path);
+          final fileName = 'profile_images/$userId.png';
+          print('Uploading file: $fileName');
+          await Supabase.instance.client.storage.from('profile-pics').upload(fileName, file);
+          final url = Supabase.instance.client.storage.from('profile-pics').getPublicUrl(fileName);
+          print('Download URL: $url');
+          setState(() {
+            _profileImageUrl = url;
+          });
+          await _saveProfile();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Successfully updated profile picture!')),
+          );
+        } catch (e) {
+          print('Error: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error in uploading: $e')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No image has selected.')),
+        );
+      }
+    }
   }
 
   @override
@@ -102,21 +180,37 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipOval(
-                child: Image.asset(
-                  'assets/profile.png',
-                  height: 150,
-                  width: 150,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  ClipOval(
+                    child: _profileImageUrl != null
+                        ? Image.network(
+                      _profileImageUrl!,
+                      height: 150,
+                      width: 150,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          height: 150,
+                          width: 150,
+                          color: Colors.grey,
+                          child: const Icon(Icons.person, size: 50, color: Colors.white),
+                        );
+                      },
+                    )
+                        : Container(
                       height: 150,
                       width: 150,
                       color: Colors.grey,
                       child: const Icon(Icons.person, size: 50, color: Colors.white),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: _pickAndUploadImage,
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
               const Text(
@@ -146,10 +240,10 @@ class _ProfilePageState extends State<ProfilePage> {
                         controller: _controllers['Name']!,
                       ),
                       ProfileInfoRow(
-                        label: 'Registration Number',
-                        value: _profileData['Registration Number']!,
+                        label: 'ID Number',
+                        value: _profileData['ID Number']!,
                         isEditing: _isEditing,
-                        controller: _controllers['Registration Number']!,
+                        controller: _controllers['ID Number']!,
                       ),
                       ProfileInfoRow(
                         label: 'Department',
@@ -182,10 +276,10 @@ class _ProfilePageState extends State<ProfilePage> {
                         controller: _controllers['Attached Hall']!,
                       ),
                       ProfileInfoRow(
-                        label: 'Percentage',
-                        value: _profileData['Percentage']!,
+                        label: 'Role',
+                        value: _profileData['Role']!,
                         isEditing: _isEditing,
-                        controller: _controllers['Percentage']!,
+                        controller: _controllers['Role']!,
                       ),
                     ],
                   ),

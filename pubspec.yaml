@@ -19,6 +19,7 @@ dependencies:
   dotenv: ^4.2.0
   http: ^0.13.3
   path_provider: ^2.0.15
+  image_picker: ^1.0.0
 
 dev_dependencies:
   flutter_test:
@@ -35,3 +36,4 @@ flutter:
     - assets/atiya.png
     - assets/biplop.png
     - assets/sara.png
+    - assets/edit_icon.png
