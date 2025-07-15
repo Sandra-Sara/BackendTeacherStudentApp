@@ -2,70 +2,73 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:ui';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'resetPasswordScreen.dart'; // Import the new ResetPasswordScreen
 
 class RequestResetPasswordScreen extends StatefulWidget {
   const RequestResetPasswordScreen({super.key});
 
   @override
-  _RequestResetPasswordScreenState createState() =>
-      _RequestResetPasswordScreenState();
+  _RequestResetPasswordScreenState createState() => _RequestResetPasswordScreenState();
 }
 
-class _RequestResetPasswordScreenState
-    extends State<RequestResetPasswordScreen> {
-  final TextEditingController newPasswordController = TextEditingController();
-  final TextEditingController confirmPasswordController =
-  TextEditingController();
+class _RequestResetPasswordScreenState extends State<RequestResetPasswordScreen> {
+  final TextEditingController emailController = TextEditingController();
   final SupabaseClient supabase = Supabase.instance.client;
+  bool _isLoading = false;
+  String? _errorMessage;
 
-  Future<void> _handleResetPassword() async {
-    String newPassword = newPasswordController.text.trim();
-    String confirmPassword = confirmPasswordController.text.trim();
+  Future<void> _requestResetPassword() async {
+    if (_isLoading) return;
 
-    if (newPassword.isEmpty || confirmPassword.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please fill all fields"),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      setState(() {
+        _errorMessage = "Please enter your email";
+        _isLoading = false;
+      });
       return;
     }
 
-    if (newPassword != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Passwords do not match"),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+      setState(() {
+        _errorMessage = "Please enter a valid email address";
+        _isLoading = false;
+      });
       return;
     }
 
     try {
-      // আসল পাসওয়ার্ড আপডেট
-      await supabase.auth.updateUser(UserAttributes(password: newPassword));
+      await supabase.auth.resetPasswordForEmail(email);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Password reset successful!"),
+          content: Text("Reset code sent to your email! Check your inbox."),
           backgroundColor: Colors.greenAccent,
         ),
       );
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: $e"),
-          backgroundColor: Colors.redAccent,
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ResetPasswordScreen(email: email),
         ),
       );
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Error: ${e.toString()}";
+      });
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   void dispose() {
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
+    emailController.dispose();
     super.dispose();
   }
 
@@ -143,7 +146,7 @@ class _RequestResetPasswordScreenState
                         child: Column(
                           children: [
                             const Text(
-                              'Set New Password',
+                              'Forgot Password',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -152,7 +155,7 @@ class _RequestResetPasswordScreenState
                             ).animate().fadeIn(duration: 600.ms),
                             const SizedBox(height: 16),
                             const Text(
-                              'Enter your new password to reset your account',
+                              'Enter your DU email to receive a reset code',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.white70,
@@ -162,7 +165,7 @@ class _RequestResetPasswordScreenState
                             ).animate().fadeIn(duration: 600.ms),
                             const SizedBox(height: 16),
                             TextField(
-                              controller: newPasswordController,
+                              controller: emailController,
                               decoration: InputDecoration(
                                 filled: true,
                                 fillColor: Colors.white24,
@@ -170,16 +173,14 @@ class _RequestResetPasswordScreenState
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
-                                labelText: 'New Password',
-                                hintText: 'Enter new password',
-                                prefixIcon:
-                                const Icon(Icons.lock, color: Colors.white70),
-                                labelStyle:
-                                const TextStyle(color: Colors.white70),
+                                labelText: 'DU Email',
+                                hintText: 'e.g., student@du.ac.bd',
+                                prefixIcon: const Icon(Icons.email, color: Colors.white70),
+                                labelStyle: const TextStyle(color: Colors.white70),
                                 hintStyle: const TextStyle(color: Colors.white54),
                               ),
                               style: const TextStyle(color: Colors.white),
-                              obscureText: true,
+                              keyboardType: TextInputType.emailAddress,
                             )
                                 .animate()
                                 .slideX(
@@ -189,35 +190,13 @@ class _RequestResetPasswordScreenState
                               curve: Curves.easeOut,
                             )
                                 .fadeIn(duration: 600.ms),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: confirmPasswordController,
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: Colors.white24,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                                labelText: 'Confirm Password',
-                                hintText: 'Re-enter new password',
-                                prefixIcon:
-                                const Icon(Icons.lock, color: Colors.white70),
-                                labelStyle:
-                                const TextStyle(color: Colors.white70),
-                                hintStyle: const TextStyle(color: Colors.white54),
+                            if (_errorMessage != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                _errorMessage!,
+                                style: const TextStyle(color: Colors.redAccent, fontSize: 14),
                               ),
-                              style: const TextStyle(color: Colors.white),
-                              obscureText: true,
-                            )
-                                .animate()
-                                .slideX(
-                              begin: -0.5,
-                              end: 0,
-                              duration: 700.ms,
-                              curve: Curves.easeOut,
-                            )
-                                .fadeIn(duration: 700.ms),
+                            ],
                             const SizedBox(height: 24),
                             Container(
                               width: double.infinity,
@@ -238,7 +217,7 @@ class _RequestResetPasswordScreenState
                                 ],
                               ),
                               child: ElevatedButton(
-                                onPressed: _handleResetPassword,
+                                onPressed: _isLoading ? null : _requestResetPassword,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
                                   shadowColor: Colors.transparent,
@@ -246,8 +225,17 @@ class _RequestResetPasswordScreenState
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: const Text(
-                                  "Reset Password",
+                                child: _isLoading
+                                    ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                    : const Text(
+                                  "Send Reset Code",
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -285,7 +273,7 @@ class _RequestResetPasswordScreenState
                         Navigator.pop(context);
                       },
                       child: const Text(
-                        "Forgot Password",
+                        "Login",
                         style: TextStyle(
                           color: Colors.yellowAccent,
                           fontWeight: FontWeight.bold,
