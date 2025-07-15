@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:ui';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Supabase যোগ করুন
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'resetPasswordScreen.dart'; // Import the ResetPasswordScreen
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -12,50 +13,56 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final TextEditingController emailController = TextEditingController();
-  final SupabaseClient supabase = Supabase.instance.client; // Supabase ইনস্ট্যান্স
+  final SupabaseClient supabase = Supabase.instance.client;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   Future<void> _handleResetPassword() async {
-    String email = emailController.text.trim();
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final email = emailController.text.trim();
 
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please enter your email"),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      setState(() {
+        _errorMessage = "Please enter your DU email";
+        _isLoading = false;
+      });
       return;
     }
 
-    if (!email.contains("@") || !email.contains(".")) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please enter a valid email"),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+      setState(() {
+        _errorMessage = "Please enter a valid DU email address";
+        _isLoading = false;
+      });
       return;
     }
 
     try {
-      await supabase.auth.resetPasswordForEmail(
-        email,
-        redirectTo: 'devcode://request-reset-password', // ডীপ লিঙ্ক
-      );
+      await supabase.auth.resetPasswordForEmail(email); // No redirectTo for code-based flow
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Password reset link sent to your email"),
+          content: Text("Reset code sent to your email! Check your inbox."),
           backgroundColor: Colors.greenAccent,
         ),
       );
-      Navigator.pushNamed(context, '/request-reset'); // RequestResetPasswordScreen-এ যান
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: $e"),
-          backgroundColor: Colors.redAccent,
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ResetPasswordScreen(email: email),
         ),
       );
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Error: ${e.toString()}";
+      });
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -139,7 +146,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         child: Column(
                           children: [
                             const Text(
-                              'Reset Password',
+                              'Forgot Password',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -148,7 +155,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                             ).animate().fadeIn(duration: 600.ms),
                             const SizedBox(height: 16),
                             const Text(
-                              'Enter your email to receive a password reset link',
+                              'Enter your DU email to receive a reset code',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.white70,
@@ -166,8 +173,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
-                                labelText: 'Email',
-                                hintText: 'e.g. user@example.com',
+                                labelText: 'DU Email',
+                                hintText: 'e.g., student@du.ac.bd',
                                 prefixIcon: const Icon(Icons.email, color: Colors.white70),
                                 labelStyle: const TextStyle(color: Colors.white70),
                                 hintStyle: const TextStyle(color: Colors.white54),
@@ -183,6 +190,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               curve: Curves.easeOut,
                             )
                                 .fadeIn(duration: 600.ms),
+                            if (_errorMessage != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                _errorMessage!,
+                                style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                              ),
+                            ],
                             const SizedBox(height: 24),
                             Container(
                               width: double.infinity,
@@ -203,7 +217,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                 ],
                               ),
                               child: ElevatedButton(
-                                onPressed: _handleResetPassword,
+                                onPressed: _isLoading ? null : _handleResetPassword,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
                                   shadowColor: Colors.transparent,
@@ -211,8 +225,17 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: const Text(
-                                  "Send Reset Link",
+                                child: _isLoading
+                                    ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                    : const Text(
+                                  "Send Reset Code",
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
