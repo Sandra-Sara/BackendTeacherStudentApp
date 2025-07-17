@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui';
-import 'dart:developer' as developer; // For logging
-import 'dashboard_page.dart';
 import 'signup.dart';
-import 'teacher_dashboard_page.dart';
-import 'about_us_page.dart';
 import 'forgot_password_page.dart';
-import 'edit_profile_page.dart';
+import 'about_us_page.dart';
 
 enum LoginType { student, teacher }
 
@@ -26,73 +21,116 @@ class _LoginPageState extends State<LoginPage> {
   LoginType _loginType = LoginType.student;
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
+  String _errorMessage = '';
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _isLoading = true;
+      _errorMessage = '';
     });
 
     try {
-      String email = emailController.text.trim();
+      String email = emailController.text.trim().toLowerCase();
       String password = passwordController.text.trim();
 
-      final supabase = Supabase.instance.client;
-      final response = await supabase.auth.signInWithPassword(
+      print('Login: Attempting to sign in with email: $email');
+
+      // Sign in with Supabase Authentication
+      final response = await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
-      if (response.user != null) {
+      final user = response.user;
+      if (user == null) {
+        throw Exception('Login failed: No user found');
+      }
+      print('Login: User signed in with ID: ${user.id}');
+
+      // Fetch profile with retries
+      var userDoc;
+      for (int attempt = 1; attempt <= 3; attempt++) {
         try {
-          final profile = await supabase
-              .from('profiles')
-              .select('name, role, id_number')
-              .eq('user_id', response.user!.id)
+          print('Login: Attempt $attempt to fetch profile for user ID: ${user.id}');
+          userDoc = await Supabase.instance.client
+              .from('profile')
+              .select()
+              .eq('id', user.id)
               .maybeSingle();
-
-          if (profile != null) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('token', response.session!.accessToken);
-            await prefs.setString('user_role', profile['role'] ?? _loginType.toString().split('.').last);
-            await prefs.setString('profile_email', email);
-            await prefs.setString('profile_name', profile['name'] ?? '');
-            if (profile['role'] == 'student') {
-              await prefs.setString('profile_reg', profile['id_number'] ?? '');
-            } else {
-              await prefs.setString('profile_teacherId', profile['id_number'] ?? '');
-            }
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => profile['role'] == 'student'
-                    ? const DashboardPage()
-                    : const TeacherDashboardPage(),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No profile found. Please sign up first!'),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const SignUpPage()),
-            );
+          break;
+        } catch (e) {
+          print('Login: Attempt $attempt failed to fetch user data: $e');
+          if (attempt == 3) {
+            throw Exception('Failed to fetch user data after retries: $e');
           }
-        } catch (queryError) {
-          developer.log('Profile Query Error: $queryError');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to fetch profile. Please try again later.'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          await Future.delayed(Duration(milliseconds: 500));
         }
       }
+
+      if (userDoc == null) {
+        print('Login: No profile found, creating default profile for user ID: ${user.id}');
+        userDoc = {
+          'id': user.id,
+          'email': email,
+          'role': _loginType == LoginType.student ? 'student' : 'teacher',
+          'name': '',
+          'department': '',
+          'phone': '',
+          'reg_no': '',
+          'teacher_id': '',
+          'semester': '',
+          'hall': '',
+          'profile_image': '',
+        };
+        for (int attempt = 1; attempt <= 3; attempt++) {
+          try {
+            await Supabase.instance.client.from('profile').insert(userDoc);
+            print('Login: Default profile created for user ID: ${user.id}');
+            break;
+          } catch (e) {
+            print('Login: Attempt $attempt failed to create default profile: $e');
+            if (attempt == 3) {
+              throw Exception('Failed to create default profile: $e');
+            }
+            await Future.delayed(Duration(milliseconds: 500));
+          }
+        }
+        // Verify profile creation
+        userDoc = await Supabase.instance.client
+            .from('profile')
+            .select()
+            .eq('id', user.id)
+            .maybeSingle();
+        if (userDoc == null) {
+          throw Exception('Failed to verify default profile creation');
+        }
+      }
+
+      String? role = userDoc['role'] as String?;
+      print('Login: User role fetched: $role');
+
+      if (role == null || (role != 'student' && role != 'teacher')) {
+        throw Exception('Invalid user role: $role');
+      }
+
+      // Verify role matches selected login type
+      if ((role == 'student' && _loginType != LoginType.student) ||
+          (role == 'teacher' && _loginType != LoginType.teacher)) {
+        throw Exception('Selected login type does not match user role: $role');
+      }
+
+      // Navigate based on role
+      String route = role == 'student' ? '/student_dashboard' : '/teacher_dashboard';
+      print('Login: Navigating to $route');
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, route);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Login successful'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } on AuthException catch (e) {
       String message;
       switch (e.code) {
@@ -100,25 +138,34 @@ class _LoginPageState extends State<LoginPage> {
           message = 'Invalid email or password.';
           break;
         case 'user_not_found':
-          message = 'No user found for that email.';
+          message = 'No user found for this email.';
           break;
         default:
           message = 'Login failed: ${e.message}';
       }
+      setState(() {
+        _errorMessage = message;
+      });
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
           backgroundColor: Colors.redAccent,
         ),
       );
-    } catch (e, stackTrace) {
-      developer.log('Unexpected Login Error: $e', stackTrace: stackTrace);
+      print('Login: AuthException: $e');
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error fetching data: $e';
+      });
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('An unexpected error occurred: $e'),
+          content: Text('Error fetching data: $e'),
           backgroundColor: Colors.redAccent,
         ),
       );
+      print('Login: General error: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -134,10 +181,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _handleSignUp() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const SignUpPage()),
-    );
+    Navigator.pushNamed(context, '/signup');
   }
 
   @override
@@ -149,6 +193,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    print('LoginPage: Building UI');
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -173,10 +218,10 @@ class _LoginPageState extends State<LoginPage> {
                       height: 110,
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {
-                        return const SizedBox(
+                        return Container(
                           width: 220,
                           height: 110,
-                          child: Icon(
+                          child: const Icon(
                             Icons.image_not_supported,
                             size: 60,
                             color: Colors.white70,
@@ -191,7 +236,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'University Of Dhaka',
+                    'University of Dhaka',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -234,13 +279,13 @@ class _LoginPageState extends State<LoginPage> {
                                 segments: const [
                                   ButtonSegment(
                                     value: LoginType.student,
-                                    label: Text('Student', style: TextStyle(color: Colors.white)),
-                                    icon: Icon(Icons.school, color: Colors.white),
+                                    label: Text('Student', style: TextStyle(color: Colors.black)),
+                                    icon: Icon(Icons.school, color: Colors.black),
                                   ),
                                   ButtonSegment(
                                     value: LoginType.teacher,
-                                    label: Text('Teacher', style: TextStyle(color: Colors.white)),
-                                    icon: Icon(Icons.person_2, color: Colors.white),
+                                    label: Text('Teacher', style: TextStyle(color: Colors.black)),
+                                    icon: Icon(Icons.person_2, color: Colors.black),
                                   ),
                                 ],
                                 selected: {_loginType},
@@ -249,6 +294,7 @@ class _LoginPageState extends State<LoginPage> {
                                     _loginType = newSelection.first;
                                     emailController.clear();
                                     passwordController.clear();
+                                    _errorMessage = '';
                                   });
                                 },
                               ).animate().fadeIn(duration: 600.ms),
@@ -271,7 +317,9 @@ class _LoginPageState extends State<LoginPage> {
                                 style: const TextStyle(color: Colors.white),
                                 keyboardType: TextInputType.emailAddress,
                                 validator: (value) {
-                                  if (value!.trim().isEmpty) return 'Please enter your email';
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Please enter your email';
+                                  }
                                   if (!value.contains('@') || !value.contains('.')) {
                                     return 'Please enter a valid email';
                                   }
@@ -302,7 +350,9 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 style: const TextStyle(color: Colors.white),
                                 validator: (value) {
-                                  if (value!.trim().isEmpty) return 'Please enter your password';
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Please enter your password';
+                                  }
                                   return null;
                                 },
                               ).animate().slideX(
@@ -311,6 +361,12 @@ class _LoginPageState extends State<LoginPage> {
                                 duration: 600.ms,
                                 curve: Curves.easeOut,
                               ).fadeIn(duration: 600.ms),
+                              const SizedBox(height: 16),
+                              if (_errorMessage.isNotEmpty)
+                                Text(
+                                  _errorMessage,
+                                  style: const TextStyle(color: Colors.redAccent),
+                                ).animate().fadeIn(duration: 500.ms),
                               const SizedBox(height: 24),
                               Container(
                                 width: double.infinity,
@@ -342,7 +398,7 @@ class _LoginPageState extends State<LoginPage> {
                                   child: _isLoading
                                       ? const CircularProgressIndicator(color: Colors.white)
                                       : const Text(
-                                    "Log In",
+                                    'Log In',
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -356,150 +412,94 @@ class _LoginPageState extends State<LoginPage> {
                                 duration: 600.ms,
                                 curve: Curves.bounceOut,
                               ),
-                              const SizedBox(height: 16),
-                              // "Edit Profile" বাটন
-                              Container(
-                                width: double.infinity,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Colors.blue, Colors.deepPurple],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => const EditProfilePage()),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    "Edit Profile",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ).animate().fadeIn(duration: 900.ms).scaleXY(
-                                begin: 0.9,
-                                end: 1.0,
-                                duration: 600.ms,
-                                curve: Curves.bounceOut,
-                              ),
-                              const SizedBox(height: 24),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Text(
-                                    "Forgot your password? ",
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                  GestureDetector(
-                                    onTap: _handleForgotPassword,
-                                    child: const Text(
-                                      "Get help",
-                                      style: TextStyle(
-                                        color: Colors.yellowAccent,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ).animate().fadeIn(duration: 1000.ms),
-                              const SizedBox(height: 32),
-                              const Divider(color: Colors.white54),
-                              const SizedBox(height: 16),
-                              const Text(
-                                "Don’t have an account?",
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: _handleSignUp,
-                                child: const Text(
-                                  "Sign Up",
-                                  style: TextStyle(
-                                    color: Colors.yellowAccent,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ).animate().fadeIn(duration: 1200.ms),
-                              const SizedBox(height: 32),
-                              Container(
-                                width: double.infinity,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Colors.blue, Colors.deepPurple],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => const AboutUsPage()),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    "About Us",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ).animate().fadeIn(duration: 1400.ms).scaleXY(
-                                begin: 0.9,
-                                end: 1.0,
-                                duration: 600.ms,
-                                curve: Curves.bounceOut,
-                              ),
                             ],
                           ),
                         ),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Forgot your password? ',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      GestureDetector(
+                        onTap: _handleForgotPassword,
+                        child: const Text(
+                          'Get help',
+                          style: TextStyle(
+                            color: Colors.yellowAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ).animate().fadeIn(duration: 1000.ms),
+                  const SizedBox(height: 32),
+                  const Divider(color: Colors.white54),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Don’t have an account? ',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  TextButton(
+                    onPressed: _handleSignUp,
+                    child: const Text(
+                      'Sign Up',
+                      style: TextStyle(
+                        color: Colors.yellowAccent,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ).animate().fadeIn(duration: 1200.ms),
+                  const SizedBox(height: 32),
+                  Container(
+                    width: double.infinity,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Colors.blue, Colors.deepPurple],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/about_us');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'About Us',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ).animate().fadeIn(duration: 1400.ms).scaleXY(
+                    begin: 0.9,
+                    end: 1.0,
+                    duration: 600.ms,
+                    curve: Curves.bounceOut,
                   ),
                 ],
               ),

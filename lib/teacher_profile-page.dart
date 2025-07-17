@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'login.dart';
+import 'teacher_profile_page.dart';
+import 'student_attendance_page.dart';
+import 'student_cgpa_page.dart';
+import 'class_routine_page.dart';
+import 'drop_update_page.dart';
+import 'student_assignment_page.dart';
 
 class TeacherDashboardPage extends StatelessWidget {
   const TeacherDashboardPage({super.key});
-
-  Future<void> _logout(BuildContext context) async {
-    try {
-      await Supabase.instance.client.auth.signOut();
-      Navigator.pushReplacementNamed(context, '/login');
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error logging out'), backgroundColor: Colors.red),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,11 +35,7 @@ class TeacherDashboardPage extends StatelessWidget {
                     height: 150,
                     width: 300,
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.error,
-                      size: 100,
-                      color: Colors.white70,
-                    ),
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.error, size: 100, color: Colors.white70),
                   ).animate().fadeIn(duration: 800.ms).scaleXY(begin: 0.8, end: 1.0),
                   const SizedBox(height: 20),
                   const Text(
@@ -65,56 +57,64 @@ class TeacherDashboardPage extends StatelessWidget {
                     children: [
                       OptionBox(
                         option: 'Profile',
-                        onTap: () => Navigator.pushNamed(context, '/teacher_profile'),
+                        onTap: () {
+                          Navigator.pushNamed(context, '/teacher_profile');
+                        },
                       ),
                       OptionBox(
                         option: 'Student Attendance',
-                        onTap: () => Navigator.pushNamed(context, '/student_attendance'),
+                        onTap: () {
+                          Navigator.pushNamed(context, '/student_attendance');
+                        },
                       ),
                       OptionBox(
                         option: 'Student CGPA',
-                        onTap: () => Navigator.pushNamed(context, '/student_cgpa'),
+                        onTap: () {
+                          Navigator.pushNamed(context, '/student_cgpa');
+                        },
                       ),
                       OptionBox(
                         option: 'Class Routine',
-                        onTap: () => Navigator.pushNamed(context, '/class_routine'),
+                        onTap: () {
+                          Navigator.pushNamed(context, '/class_routine');
+                        },
                       ),
                       OptionBox(
                         option: 'Drop Update',
-                        onTap: () => Navigator.pushNamed(context, '/drop_update'),
+                        onTap: () {
+                          Navigator.pushNamed(context, '/drop_update');
+                        },
                       ),
                       OptionBox(
-                        option: 'Student Assignments',
-                        onTap: () => Navigator.pushNamed(context, '/student_assignment'),
+                        option: 'Student Assignment',
+                        onTap: () {
+                          Navigator.pushNamed(context, '/student_assignment');
+                        },
                       ),
                     ],
                   ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.5, end: 0),
                   const SizedBox(height: 20),
-                  Container(
-                    width: 200,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Colors.redAccent, Colors.red],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                  ElevatedButton(
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove('token');
+                      await prefs.remove('email');
+                      Navigator.pushReplacementNamed(context, '/login');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      minimumSize: const Size(200, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      elevation: 5,
                     ),
-                    child: ElevatedButton(
-                      onPressed: () => _logout(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text(
-                        'Logout',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    child: const Text(
+                      'Logout',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ).animate().fadeIn(duration: 800.ms),

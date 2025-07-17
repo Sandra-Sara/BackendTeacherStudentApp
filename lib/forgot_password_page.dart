@@ -2,22 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:ui';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'resetPasswordScreen.dart'; // Import the new ResetPasswordScreen
+import 'resetPasswordScreen.dart'; // Import the ResetPasswordScreen
 
-class RequestResetPasswordScreen extends StatefulWidget {
-  const RequestResetPasswordScreen({super.key});
+class ForgotPasswordPage extends StatefulWidget {
+  const ForgotPasswordPage({super.key});
 
   @override
-  _RequestResetPasswordScreenState createState() => _RequestResetPasswordScreenState();
+  _ForgotPasswordPageState createState() => _ForgotPasswordPageState();
 }
 
-class _RequestResetPasswordScreenState extends State<RequestResetPasswordScreen> {
+class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final TextEditingController emailController = TextEditingController();
   final SupabaseClient supabase = Supabase.instance.client;
   bool _isLoading = false;
   String? _errorMessage;
 
-  Future<void> _requestResetPassword() async {
+  Future<void> _handleResetPassword() async {
     if (_isLoading) return;
 
     setState(() {
@@ -29,7 +29,7 @@ class _RequestResetPasswordScreenState extends State<RequestResetPasswordScreen>
 
     if (email.isEmpty) {
       setState(() {
-        _errorMessage = "Please enter your email";
+        _errorMessage = "Please enter your DU email";
         _isLoading = false;
       });
       return;
@@ -37,14 +37,14 @@ class _RequestResetPasswordScreenState extends State<RequestResetPasswordScreen>
 
     if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
       setState(() {
-        _errorMessage = "Please enter a valid email address";
+        _errorMessage = "Please enter a valid DU email address";
         _isLoading = false;
       });
       return;
     }
 
     try {
-      await supabase.auth.resetPasswordForEmail(email);
+      await supabase.auth.resetPasswordForEmail(email); // No redirectTo for code-based flow
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Reset code sent to your email! Check your inbox."),
@@ -173,7 +173,7 @@ class _RequestResetPasswordScreenState extends State<RequestResetPasswordScreen>
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
-                                labelText: 'Your Email',
+                                labelText: 'DU Email',
                                 hintText: 'e.g., student@du.ac.bd',
                                 prefixIcon: const Icon(Icons.email, color: Colors.white70),
                                 labelStyle: const TextStyle(color: Colors.white70),
@@ -217,7 +217,7 @@ class _RequestResetPasswordScreenState extends State<RequestResetPasswordScreen>
                                 ],
                               ),
                               child: ElevatedButton(
-                                onPressed: _isLoading ? null : _requestResetPassword,
+                                onPressed: _isLoading ? null : _handleResetPassword,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
                                   shadowColor: Colors.transparent,
@@ -263,7 +263,7 @@ class _RequestResetPasswordScreenState extends State<RequestResetPasswordScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text(
-                      "Back to ",
+                      "Remembered your password? ",
                       style: TextStyle(
                         color: Colors.white70,
                       ),
@@ -273,7 +273,7 @@ class _RequestResetPasswordScreenState extends State<RequestResetPasswordScreen>
                         Navigator.pop(context);
                       },
                       child: const Text(
-                        "Login",
+                        "Back to Login",
                         style: TextStyle(
                           color: Colors.yellowAccent,
                           fontWeight: FontWeight.bold,
