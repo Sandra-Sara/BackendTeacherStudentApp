@@ -83,7 +83,7 @@ class _StudentAssignmentPageState extends State<StudentAssignmentPage> {
       var query = Supabase.instance.client
           .from('classwork_submissions')
           .select(
-              'id, course_id, user_id, submission_text, file_url, created_at, submissioncourse!left(course_name)')
+          'id, course_id, user_id, submission_text, file_url, created_at, submissioncourse!left(course_name)')
           .order('created_at', ascending: false);
 
       final response = await query;
@@ -104,7 +104,7 @@ class _StudentAssignmentPageState extends State<StudentAssignmentPage> {
             'fileName': fileUrl.isNotEmpty ? fileUrl.split('/').last : '',
             'date': s['created_at'] != null
                 ? DateFormat('dd/MM/yyyy')
-                    .format(DateTime.parse(s['created_at']))
+                .format(DateTime.parse(s['created_at']))
                 : '',
           };
         }).toList();
@@ -247,7 +247,7 @@ class _StudentAssignmentPageState extends State<StudentAssignmentPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.blue, Colors.deepPurple],
+            colors: [Colors.blue, Colors.blue],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -313,99 +313,99 @@ class _StudentAssignmentPageState extends State<StudentAssignmentPage> {
                   const SizedBox(height: 10),
                   _isLoading
                       ? const Center(
-                          child: CircularProgressIndicator(color: Colors.white))
+                      child: CircularProgressIndicator(color: Colors.white))
                       : submissions.isEmpty
-                          ? const Text(
-                              'No submissions available',
-                              style: TextStyle(
-                                  fontSize: 16, color: Colors.white70),
-                            ).animate().fadeIn(duration: 600.ms)
-                          : ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: BackdropFilter(
-                                filter:
-                                    ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                        color: Colors.white.withOpacity(0.2),
-                                        width: 1.5),
-                                  ),
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
-                                    itemCount: submissions.length,
-                                    itemBuilder: (context, index) {
-                                      final submission = submissions[index];
-                                      return ListTile(
-                                        leading:
-                                            submission['fileName'].isNotEmpty
-                                                ? const Icon(
-                                                    Icons.insert_drive_file,
-                                                    color: Colors.white70)
-                                                : null,
-                                        title: Text(
-                                          '${submission['courseName']}: ${submission['text'].isNotEmpty ? submission['text'] : '(No text)'}',
-                                          style: const TextStyle(
-                                              color: Colors.white),
-                                        ),
-                                        subtitle: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              submission['date'],
-                                              style: const TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: 14),
-                                            ),
-                                            if (_isTeacher)
-                                              Text(
-                                                'Submitted by: ${submission['userId']}',
-                                                style: const TextStyle(
-                                                    color: Colors.white70,
-                                                    fontSize: 14),
-                                              ),
-                                            if (submission['fileName']
-                                                .isNotEmpty)
-                                              GestureDetector(
-                                                onTap: () => _openFile(
-                                                    submission['fileUrl']),
-                                                child: Text(
-                                                  'File: ${submission['fileName']}',
-                                                  style: const TextStyle(
-                                                    color: Colors.blue,
-                                                    fontSize: 14,
-                                                    decoration: TextDecoration
-                                                        .underline,
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                        trailing: _isTeacher
-                                            ? IconButton(
-                                                icon: const Icon(Icons.delete,
-                                                    color: Colors.red),
-                                                onPressed: () =>
-                                                    _deleteSubmission(
-                                                  submission['id'],
-                                                  submission['fileUrl'],
-                                                ),
-                                              )
-                                            : null,
-                                      );
-                                    },
-                                  ),
-                                ),
+                      ? const Text(
+                    'No submissions available',
+                    style: TextStyle(
+                        fontSize: 16, color: Colors.white70),
+                  ).animate().fadeIn(duration: 600.ms)
+                      : ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: BackdropFilter(
+                      filter:
+                      ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 1.5),
+                        ),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          physics:
+                          const NeverScrollableScrollPhysics(),
+                          itemCount: submissions.length,
+                          itemBuilder: (context, index) {
+                            final submission = submissions[index];
+                            return ListTile(
+                              leading:
+                              submission['fileName'].isNotEmpty
+                                  ? const Icon(
+                                  Icons.insert_drive_file,
+                                  color: Colors.white70)
+                                  : null,
+                              title: Text(
+                                '${submission['courseName']}: ${submission['text'].isNotEmpty ? submission['text'] : '(No text)'}',
+                                style: const TextStyle(
+                                    color: Colors.white),
                               ),
-                            )
-                              .animate()
-                              .fadeIn(duration: 600.ms)
-                              .slideY(begin: 0.5),
+                              subtitle: Column(
+                                crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    submission['date'],
+                                    style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 14),
+                                  ),
+                                  if (_isTeacher)
+                                    Text(
+                                      'Submitted by: ${submission['userId']}',
+                                      style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 14),
+                                    ),
+                                  if (submission['fileName']
+                                      .isNotEmpty)
+                                    GestureDetector(
+                                      onTap: () => _openFile(
+                                          submission['fileUrl']),
+                                      child: Text(
+                                        'File: ${submission['fileName']}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          decoration: TextDecoration
+                                              .underline,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              trailing: _isTeacher
+                                  ? IconButton(
+                                icon: const Icon(Icons.delete,
+                                    color: Colors.red),
+                                onPressed: () =>
+                                    _deleteSubmission(
+                                      submission['id'],
+                                      submission['fileUrl'],
+                                    ),
+                              )
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 600.ms)
+                      .slideY(begin: 0.5),
                   const SizedBox(height: 20),
                   Center(
                     child: Container(
@@ -413,7 +413,7 @@ class _StudentAssignmentPageState extends State<StudentAssignmentPage> {
                       height: 50,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Colors.blue, Colors.deepPurple],
+                          colors: [Colors.blue, Colors.lightBlueAccent],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
