@@ -290,7 +290,7 @@ class _DropUpdatePageState extends State<DropUpdatePage> {
       } else {
         setState(() {
           _errorMessage = 'No file selected';
-          _errorMessageColor = Colors.blue;
+          _errorMessageColor = Colors.white;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_errorMessage), backgroundColor: _errorMessageColor),
@@ -365,7 +365,7 @@ class _DropUpdatePageState extends State<DropUpdatePage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.blue, Colors.deepPurple],
+            colors: [Colors.blue, Colors.blue],
           ),
         ),
         child: SafeArea(
@@ -482,7 +482,7 @@ class _DropUpdatePageState extends State<DropUpdatePage> {
                                 Container(
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
-                                      colors: [Colors.blue, Colors.deepPurple],
+                                      colors: [Colors.blue, Colors.blue],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
@@ -525,7 +525,7 @@ class _DropUpdatePageState extends State<DropUpdatePage> {
                                 height: 50,
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
-                                    colors: [Colors.blue, Colors.deepPurple],
+                                    colors: [Colors.blue, Colors.lightBlue],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
@@ -632,7 +632,7 @@ class _DropUpdatePageState extends State<DropUpdatePage> {
                                       child: Text(
                                         'File: ${announcement['fileName']}',
                                         style: const TextStyle(
-                                          color: Colors.blue,
+                                          color: Colors.white,
                                           fontSize: 14,
                                           decoration: TextDecoration.underline,
                                         ),
